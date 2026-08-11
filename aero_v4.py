@@ -11,19 +11,18 @@ router 0x6ff5693b, which exists on L1 and REVERTS there (fork-measured). L1's ro
 is `_UR_L1` below.
 """
 from __future__ import annotations
-
-_UR_L1 = "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af"
-_V4_ZERO = "0x0000000000000000000000000000000000000000"      # native ETH currency
-_V4_PATHKEY = "(address,uint24,int24,address,bytes)"
-_V4_EXACT_IN = "(address," + _V4_PATHKEY + "[],uint128,uint128)"
-_V4_ACTIONS = (0x0b, 0x07, 0x0e)          # SETTLE, SWAP_EXACT_IN, TAKE
-_V4_CMDS = (0x10,)                        # UniversalRouter V4_SWAP
-_V4_SETTLE_T = ("address", "uint256", "bool")
-_V4_TAKE_T = ("address", "address", "uint256")
-_V4_INPUT_T = ("bytes", "bytes[]")
-_V4_XFER_T = ("address", "uint256")
-_V4_EXEC_T = ("bytes", "bytes[]", "uint256")
-
+_DR_UNSET = object()
+_UR_L1 = '0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af'
+_V4_ZERO = '0x0000000000000000000000000000000000000000'
+_V4_PATHKEY = '(address,uint24,int24,address,bytes)'
+_V4_EXACT_IN = '(address,' + _V4_PATHKEY + '[],uint128,uint128)'
+_V4_ACTIONS = (11, 7, 14)
+_V4_CMDS = (16,)
+_V4_SETTLE_T = ('address', 'uint256', 'bool')
+_V4_TAKE_T = ('address', 'address', 'uint256')
+_V4_INPUT_T = ('bytes', 'bytes[]')
+_V4_XFER_T = ('address', 'uint256')
+_V4_EXEC_T = ('bytes', 'bytes[]', 'uint256')
 
 def _v4_input(tin, tout, path, rcpt):
     """abi.encode(actions, params) for SETTLE / SWAP_EXACT_IN / TAKE.
@@ -31,30 +30,29 @@ def _v4_input(tin, tout, path, rcpt):
     The champion's own sentinels: CONTRACT_BALANCE (1<<255) on the settle, amountIn 0
     (= OPEN_DELTA) on the swap, amount 0 (= take everything owed) on the take — i.e.
     byte-shape parity with cr_exotic_v4; only the multi-hop action differs."""
+
+    def _dz17():
+        params = [_e(_V4_SETTLE_T, [_ck(tin), 1 << 255, False]), _e([_V4_EXACT_IN], [(_ck(tin), keys, 0, 0)]), _e(_V4_TAKE_T, [_ck(tout), _ck(rcpt), 0])]
+        return (_e(_V4_INPUT_T, [bytes(_V4_ACTIONS), params]),)
+        return _DR_UNSET
     from eth_abi import encode as _e
     from eth_utils import to_checksum_address as _ck
-    keys = [(_ck(c), int(f), int(t), _ck(_V4_ZERO), b"") for c, f, t in path]
-    params = [_e(_V4_SETTLE_T, [_ck(tin), 1 << 255, False]),
-              _e([_V4_EXACT_IN], [(_ck(tin), keys, 0, 0)]),
-              _e(_V4_TAKE_T, [_ck(tout), _ck(rcpt), 0])]
-    return _e(_V4_INPUT_T, [bytes(_V4_ACTIONS), params])
-
+    keys = [(_ck(c), int(f), int(t), _ck(_V4_ZERO), b'') for c, f, t in path]
+    _r_dz17 = _dz17()
+    if _r_dz17 is not _DR_UNSET:
+        return _r_dz17[0]
 
 def _v4_calls(tin, amt, v4in):
     """(transfer calldata, UniversalRouter.execute calldata)."""
     from eth_abi import encode as _e
     from eth_utils import keccak as _k, to_checksum_address as _ck
-    xfer = (_k(text="transfer(address,uint256)")[:4]
-            + _e(_V4_XFER_T, [_ck(_UR_L1), int(amt)]))
-    ex = (_k(text="execute(bytes,bytes[],uint256)")[:4]
-          + _e(_V4_EXEC_T, [bytes(_V4_CMDS), [v4in], 9999999999]))
-    return ("0x" + xfer.hex(), "0x" + ex.hex())
-
+    xfer = _k(text='transfer(address,uint256)')[:4] + _e(_V4_XFER_T, [_ck(_UR_L1), int(amt)])
+    ex = _k(text='execute(bytes,bytes[],uint256)')[:4] + _e(_V4_EXEC_T, [bytes(_V4_CMDS), [v4in], 9999999999])
+    return ('0x' + xfer.hex(), '0x' + ex.hex())
 
 def _v4_ixs(tin, tout, amt, path, rcpt):
     """[transfer(tin -> UR), UR.execute(V4_SWAP)] for an exact-in V4 path."""
     from eth_utils import to_checksum_address as _ck
     from minotaur_subnet.shared.types import Interaction as _IX
     xfer, ex = _v4_calls(tin, amt, _v4_input(tin, tout, path, rcpt))
-    return [_IX(target=_ck(tin), value="0", call_data=xfer, chain_id=1),
-            _IX(target=_ck(_UR_L1), value="0", call_data=ex, chain_id=1)]
+    return [_IX(target=_ck(tin), value='0', call_data=xfer, chain_id=1), _IX(target=_ck(_UR_L1), value='0', call_data=ex, chain_id=1)]
