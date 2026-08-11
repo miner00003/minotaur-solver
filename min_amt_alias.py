@@ -8,13 +8,12 @@ scored dropped=43. Cached per provider instance; first call wins; fail-open thro
 """
 try:
     from web3.providers.rpc import HTTPProvider as _MinoHP
-
-    if not getattr(_MinoHP, "_mino_chainid_memo", False):
+    if not getattr(_MinoHP, '_mino_chainid_memo', False):
         _mino_orig_make_request = _MinoHP.make_request
 
         def _mino_make_request(self, method, params):
-            if method == "eth_chainId":
-                _c = getattr(self, "_mino_cid_cache", None)
+            if method == 'eth_chainId':
+                _c = getattr(self, '_mino_cid_cache', None)
                 if _c is not None:
                     return _c
                 _r = _mino_orig_make_request(self, method, params)
@@ -24,17 +23,11 @@ try:
                     pass
                 return _r
             return _mino_orig_make_request(self, method, params)
-
         _MinoHP.make_request = _mino_make_request
         _MinoHP._mino_chainid_memo = True
 except Exception:
     pass
-_UNUSED_DOC = """
-
-Fires ONLY when the normalized input_amount is 0 and the raw params carry a
-positive aliased amount. See scripts/amtalias_edge.py for evidence.
-"""
-
+_UNUSED_DOC = '\n\nFires ONLY when the normalized input_amount is 0 and the raw params carry a\npositive aliased amount. See scripts/amtalias_edge.py for evidence.\n'
 
 def _raw_params(state):
     typed = getattr(state, 'typed_context', None)
@@ -53,8 +46,8 @@ def _raw_params(state):
     raw = getattr(state, 'raw_params', None)
     return raw if isinstance(raw, dict) else {}
 
-
 def install(cls):
+
     class _AmtAlias(cls):
 
         def _normalized_swap_params(self, intent, state):
