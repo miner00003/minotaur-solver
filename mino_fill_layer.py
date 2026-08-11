@@ -1,86 +1,70 @@
 """lattice fill layer — EMPTY-ONLY overlay above the reigning solver stack."""
 from __future__ import annotations
-
+_DR_UNSET = object()
 import json
 import logging
 import os
 import time
 
-_log = logging.getLogger(__name__)
-
-_FILL_NONCE = "6"          # rewritten per build; keeps each bench fingerprint distinct
-_TABLE_FILE = "mino_fill_rows.json"
-
-# Aggregator routers whose calldata carries an embedded minReturn (see _rank).
-_AGG_ROUTERS = frozenset({"0x6131b5fae19ea4f9d964eac0408e4408b66337b5"})
-
-# Wall-clock envelope for the empty-confirm re-ask (see _base_plan). The bench
-# allows 30s per plan; 26 leaves headroom for the overlay build that follows.
-_PLAN_BUDGET_S = 26.0
-_MAX_ASKS = 2
-
+def _dz281():
+    _log = logging.getLogger(__name__)
+    _FILL_NONCE = '6'
+    _TABLE_FILE = 'mino_fill_rows.json'
+    _AGG_ROUTERS = frozenset({'0x6131b5fae19ea4f9d964eac0408e4408b66337b5'})
+    _PLAN_BUDGET_S = 26.0
+    _MAX_ASKS = 2
+    return (_log, _FILL_NONCE, _TABLE_FILE, _AGG_ROUTERS, _PLAN_BUDGET_S, _MAX_ASKS)
+_log, _FILL_NONCE, _TABLE_FILE, _AGG_ROUTERS, _PLAN_BUDGET_S, _MAX_ASKS = _dz281()
 
 def _table_path() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), _TABLE_FILE)
 
-
 def _minted(row) -> int:
-    # top-level "minted" stamp counts too: a fresh flat re-mint must be able
-    # to beat a stale routed mint of the same key from the other source —
-    # without this, a lattice_wins route from days ago (expired aggregator
-    # minReturn -> reverts at sim) shadows our verified working replacement
     if not isinstance(row, dict):
         return 0
-    best = int(row.get("minted") or 0)
-    routes = row.get("routes")
+    best = int(row.get('minted') or 0)
+    routes = row.get('routes')
     if isinstance(routes, list):
         for r in routes:
             if isinstance(r, dict):
-                m = int(r.get("minted_at") or 0)
+                m = int(r.get('minted_at') or 0)
                 if m > best:
                     best = m
     return best
-
 
 def _served(row) -> list:
     """The legs this row would actually serve (newest whole route, else flat)."""
     if not isinstance(row, dict):
         return []
-    live = [r for r in (row.get("routes") or [])
-            if isinstance(r, dict) and r.get("interactions")]
+    live = [r for r in row.get('routes') or [] if isinstance(r, dict) and r.get('interactions')]
     if live:
-        return max(live, key=lambda r: int(r.get("minted_at") or 0))["interactions"]
-    return row.get("interactions") or []
-
+        return max(live, key=lambda r: int(r.get('minted_at') or 0))['interactions']
+    return row.get('interactions') or []
 
 def _rank(row) -> tuple:
-    # DURABILITY OUTRANKS FRESHNESS. Aggregator calldata embeds a minReturn
-    # fixed at mint time; once price drifts past it the call REVERTS at the
-    # bench sim and the row scores 0 — indistinguishable from no cover at
-    # all. A direct-venue route (minOut 0, deadline 2100) cannot expire, so
-    # it outranks an aggregator route of ANY age; recency only breaks ties
-    # within a class. Measured 08-05: 379 union keys were serving an
-    # aggregator corpse while a working direct route sat in the other table.
-    agg = any(str(leg.get("target", "")).lower() in _AGG_ROUTERS
-              for leg in _served(row) if isinstance(leg, dict))
+    agg = any((str(leg.get('target', '')).lower() in _AGG_ROUTERS for leg in _served(row) if isinstance(leg, dict)))
     return (0 if agg else 1, _minted(row))
-
 
 def _merge_source(rows: dict, fn: str) -> None:
     """Fold one overlay file into `rows`, best-ranked row per key winning."""
-    base = os.path.dirname(os.path.abspath(__file__))
-    try:
+
+    def _dz281():
         with open(os.path.join(base, fn)) as fh:
             loaded = json.load(fh)
         if not isinstance(loaded, dict):
-            return
+            return (None,)
         for k, v in loaded.items():
             held = rows.get(k)
             if held is None or _rank(v) >= _rank(held):
                 rows[k] = v
+        return _DR_UNSET
+    base = os.path.dirname(os.path.abspath(__file__))
+    try:
+        _r_dz281 = _dz281()
+        if _r_dz281 is not _DR_UNSET:
+            return _r_dz281[0]
     except Exception:
-        _log.warning("[minofill] overlay source %s unreadable; continuing", fn)
-
+        _log.warning('[minofill] overlay source %s unreadable; continuing', fn)
 
 def _read_table() -> dict:
     """Primary table (mino_fill_rows.json) unioned over the lineage's shared.
@@ -95,15 +79,12 @@ def _read_table() -> dict:
     gap we can safely shrink.
     """
     rows: dict = {}
-    for fn in ("lattice_wins.json", _TABLE_FILE):
+    for fn in ('lattice_wins.json', _TABLE_FILE):
         _merge_source(rows, fn)
     if not rows:
-        _log.warning("[minofill] no overlay tables; layer is inert")
+        _log.warning('[minofill] no overlay tables; layer is inert')
     return rows
-
-
 _ROWS = _read_table()
-
 
 def _read_overrides() -> frozenset:
     """Measured override keys — a SEPARATE file on purpose.
@@ -115,32 +96,25 @@ def _read_overrides() -> frozenset:
     """
     base = os.path.dirname(os.path.abspath(__file__))
     try:
-        with open(os.path.join(base, "mino_ovr.json")) as fh:
+        with open(os.path.join(base, 'mino_ovr.json')) as fh:
             return frozenset(json.load(fh))
     except Exception:
-        return frozenset()          # absent/corrupt => plain empty-only behaviour
-
-
+        return frozenset()
 _OVR = _read_overrides()
-
-
-# Executor fallback: a state that omits its contract used to void the ENTIRE
-# table for that order (the key builder returned None) while looking healthy.
-_EXECUTORS = {1: "0xcd42cf6fd6e0c539cae038fe6a73c67f8c1c7a52",
-              8453: "0xe0d97941103c30799fa0aa9d54a34246846c73bf"}
-
+_EXECUTORS = {1: '0xcd42cf6fd6e0c539cae038fe6a73c67f8c1c7a52', 8453: '0xe0d97941103c30799fa0aa9d54a34246846c73bf'}
 
 def _trade(state) -> tuple:
     """(chain, contract, tin, tout, amount) pulled from the bench's IntentState."""
-    params = getattr(state, "raw_params", None) or {}
-    chain = int(getattr(state, "chain_id", 0) or 0)
-    contract = str(getattr(state, "contract_address", "") or "").lower()
-    return (chain,
-            contract or _EXECUTORS.get(chain, ""),
-            str(params.get("input_token") or "").lower(),
-            str(params.get("output_token") or "").lower(),
-            int(params.get("input_amount") or 0))
 
+    def _dz280():
+        chain = int(getattr(state, 'chain_id', 0) or 0)
+        contract = str(getattr(state, 'contract_address', '') or '').lower()
+        return ((chain, contract or _EXECUTORS.get(chain, ''), str(params.get('input_token') or '').lower(), str(params.get('output_token') or '').lower(), int(params.get('input_amount') or 0)),)
+        return _DR_UNSET
+    params = getattr(state, 'raw_params', None) or {}
+    _r_dz280 = _dz280()
+    if _r_dz280 is not _DR_UNSET:
+        return _r_dz280[0]
 
 def _row_key(state) -> str | None:
     """chain|contract_address|tin|tout|amount, byte-identical to the bench's own key."""
@@ -150,8 +124,7 @@ def _row_key(state) -> str | None:
         return None
     if not (tin and tout and amount and contract):
         return None
-    return f"{chain}|{contract}|{tin}|{tout}|{amount}"
-
+    return f'{chain}|{contract}|{tin}|{tout}|{amount}'
 
 def _is_empty(plan) -> bool:
     """Is there nothing here worth keeping? (Only then may the overlay answer.)
@@ -172,29 +145,28 @@ def _is_empty(plan) -> bool:
     try:
         if plan is None:
             return True
-        if getattr(plan, "interactions", None):
+        if getattr(plan, 'interactions', None):
             return False
-        return not (getattr(plan, "metadata", None) or {}).get("cross_chain_plan")
+        return not (getattr(plan, 'metadata', None) or {}).get('cross_chain_plan')
     except Exception:
         return True
 
-
 def _freshest(row):
     """Newest minted route for a key."""
-    routes = row.get("routes")
-    if isinstance(routes, list):
-        # FALLBACK CHAIN (08-05): walk mints newest -> oldest and serve the
-        # first STRUCTURALLY WHOLE one (every leg has target+calldata). A
-        # newest-only pick turned one malformed re-mint into a dead key even
-        # while older good calldata sat right next to it in the same row.
-        live = [r for r in routes if isinstance(r, dict) and r.get("interactions")]
-        for cand in sorted(live, key=lambda r: -int(r.get("minted_at") or 0)):
-            ix = cand.get("interactions") or []
-            if ix and all(isinstance(l, dict) and l.get("target")
-                          and (l.get("call_data") or l.get("data")) for l in ix):
-                return ix
-    return row.get("interactions") or []
 
+    def _dz279():
+        for cand in sorted(live, key=lambda r: -int(r.get('minted_at') or 0)):
+            ix = cand.get('interactions') or []
+            if ix and all((isinstance(l, dict) and l.get('target') and (l.get('call_data') or l.get('data')) for l in ix)):
+                return (ix,)
+        return _DR_UNSET
+    routes = row.get('routes')
+    if isinstance(routes, list):
+        live = [r for r in routes if isinstance(r, dict) and r.get('interactions')]
+        _r_dz279 = _dz279()
+        if _r_dz279 is not _DR_UNSET:
+            return _r_dz279[0]
+    return row.get('interactions') or []
 
 def _legs(row, chain, Interaction):
     """Stored interactions -> Interaction objects, verbatim."""
@@ -203,49 +175,18 @@ def _legs(row, chain, Interaction):
         return None
     built = []
     for leg in stored:
-        data = leg.get("call_data") or leg.get("data")
-        target = leg.get("target")
+        data = leg.get('call_data') or leg.get('data')
+        target = leg.get('target')
         if not (target and data):
             return None
-        built.append(Interaction(target=target, value=str(leg.get("value", "0")),
-                                 call_data=data, chain_id=chain))
+        built.append(Interaction(target=target, value=str(leg.get('value', '0')), call_data=data, chain_id=chain))
     return built
-
-
-_AGG_MAX_AGE_S = 86400.0   # an aggregator mint older than this is assumed drifted
-
-# DRIFT MARGIN for the evidence override. `out` and `tgt` are both measured when the
-# row is mined; by bench time BOTH have moved, and independently. Measured on
-# q_4d42ad14 (round e29772728): we overrode on a +1.67% recorded edge, but by the
-# bench the champion had improved +1.12% while our own route drifted -0.67%, so the
-# edge became a -0.124% LOSS — one regression, and it cancelled our only win and cost
-# the round (1 better / 1 worse; adoption needs wins >= regressions + 1).
-#
-# The payoff is asymmetric, which is what sets the size: standing aside on a marginal
-# row costs at most a few bps of `win`, while overriding into a regression BLOCKS
-# ADOPTION outright. So demand an edge wider than plausible drift rather than any edge
-# at all. 200 bps comfortably covers the ~180 bps of combined drift observed.
+_AGG_MAX_AGE_S = 86400.0
 _EVIDENCE_MARGIN_BPS = 200
-
-# ...but drift is a RATE, not a constant, and a flat margin prices every row as if its
-# evidence were hours old. That is wrong in both directions, and the cost of being
-# wrong the strict way is now measured: cards e29772887 and e29773123 came back
-# 0 better / 50 matched. Standing aside everywhere is not safe, it is a guaranteed
-# non-adoption — `performance_adopt` needs net_better >= n_regressions + 1, so a card
-# that never overrides can never clear the margin no matter how clean it is.
-#
-# The 180 bps of combined drift behind the constant above accumulated over ~3.5 h
-# (q_4d42ad14 minted 12:28, benched ~16:00). Per hour that is ~50 bps, and evidence
-# minted minutes before a fire has barely moved at all. So scale the demand by the
-# age of the evidence: a fresh measured edge fires on a modest margin, an old one must
-# clear far more than the flat constant ever asked. Both ends are tighter than a flat
-# 200 — more wins available where we actually know the answer, more caution where we
-# do not.
-_EVIDENCE_DUEL_BPS = 30         # same-block head-to-head: no drift to absorb, noise only
-_EVIDENCE_FLOOR_BPS = 60        # never fire on less, however fresh (bench noise)
-_EVIDENCE_DRIFT_BPS_PER_H = 50  # measured: ~180 bps over ~3.5 h, both sides combined
-_EVIDENCE_MAX_BPS = 600         # beyond ~11 h the row is a guess; demand a lot
-
+_EVIDENCE_DUEL_BPS = 30
+_EVIDENCE_FLOOR_BPS = 60
+_EVIDENCE_DRIFT_BPS_PER_H = 50
+_EVIDENCE_MAX_BPS = 600
 
 def _evidence_margin_bps(row) -> int:
     """Required edge, in bps, for evidence of this row's age.
@@ -270,7 +211,7 @@ def _evidence_margin_bps(row) -> int:
     a flat ZERO), so duel-proven rows are precisely the scarce, trustworthy ones.
     They earn the noise floor; everything else keeps the age curve.
     """
-    if str((row or {}).get("src") or "") == "duel":
+    if str((row or {}).get('src') or '') == 'duel':
         return _EVIDENCE_DUEL_BPS
     try:
         minted = _minted(row)
@@ -282,7 +223,6 @@ def _evidence_margin_bps(row) -> int:
     need = _EVIDENCE_FLOOR_BPS + int(age_h * _EVIDENCE_DRIFT_BPS_PER_H)
     return max(_EVIDENCE_FLOOR_BPS, min(_EVIDENCE_MAX_BPS, need))
 
-
 def _expired_agg(row) -> bool:
     """Is this row served by aggregator calldata old enough to have drifted?
 
@@ -292,14 +232,12 @@ def _expired_agg(row) -> bool:
     """
     try:
         legs = _served(row)
-        if not any(str(leg.get("target", "")).lower() in _AGG_ROUTERS
-                   for leg in legs if isinstance(leg, dict)):
+        if not any((str(leg.get('target', '')).lower() in _AGG_ROUTERS for leg in legs if isinstance(leg, dict))):
             return False
         minted = _minted(row)
-        return minted <= 0 or (time.time() - minted) > _AGG_MAX_AGE_S
+        return minted <= 0 or time.time() - minted > _AGG_MAX_AGE_S
     except Exception:
         return False
-
 
 def _floor(state) -> int:
     """The order's minimum acceptable output, 0 when the row has no floor.
@@ -314,8 +252,8 @@ def _floor(state) -> int:
     ord_57be10f7e1b4486b both benched ours=0 against a champion serving 1916351, and
     nothing in this layer had any concept that a floor existed.
     """
-    params = getattr(state, "raw_params", None) or {}
-    for k in ("min_output_amount", "suggested_min_output", "min_output"):
+    params = getattr(state, 'raw_params', None) or {}
+    for k in ('min_output_amount', 'suggested_min_output', 'min_output'):
         try:
             v = int(params.get(k) or 0)
         except Exception:
@@ -323,7 +261,6 @@ def _floor(state) -> int:
         if v > 0:
             return v
     return 0
-
 
 def _clears_floor(row, state) -> bool:
     """Would this stored row actually SCORE, or is it a zero wearing a route's clothes?
@@ -335,11 +272,10 @@ def _clears_floor(row, state) -> bool:
     if floor <= 0:
         return True
     try:
-        out = int((row or {}).get("out") or 0)
+        out = int((row or {}).get('out') or 0)
     except Exception:
         return True
     return out <= 0 or out >= floor
-
 
 def _pays_executor(row, chain) -> bool:
     """Does this plan actually DELIVER to the address the scorer credits?
@@ -373,22 +309,27 @@ def _pays_executor(row, chain) -> bool:
     argument is the spender, never the recipient; unknown chains fall through
     permissively so this can only ever suppress a route we can positively indict.
     """
-    app = _EXECUTORS.get(int(chain or 0))
-    if not app:
-        return True
-    legs = _served(row)
-    if not legs:
-        return True
-    for leg in legs:
-        if not isinstance(leg, dict):
-            continue
-        data = str(leg.get("call_data") or leg.get("data") or "").lower()
-        if data[:10] == "0x095ea7b3":
-            continue
-        if app.lower()[2:] in data:
-            return True
-    return False
 
+    def _dz278():
+        if not app:
+            return (True,)
+        legs = _served(row)
+        if not legs:
+            return (True,)
+        for leg in legs:
+            if not isinstance(leg, dict):
+                continue
+            data = str(leg.get('call_data') or leg.get('data') or '').lower()
+            if data[:10] == '0x095ea7b3':
+                continue
+            if app.lower()[2:] in data:
+                return (True,)
+        return (False,)
+        return _DR_UNSET
+    app = _EXECUTORS.get(int(chain or 0))
+    _r_dz278 = _dz278()
+    if _r_dz278 is not _DR_UNSET:
+        return _r_dz278[0]
 
 def _override(state) -> bool:
     """Has this row been MEASURED to beat the base's own plan by a material margin?
@@ -437,14 +378,13 @@ def _override(state) -> bool:
         key = _row_key(state)
         row = _ROWS.get(key) or {}
         if _expired_agg(row):
-            return False            # never trade a match for a probable revert
+            return False
         if key in _OVR:
             return True
-        out, tgt = int(row.get("out") or 0), int(row.get("tgt") or 0)
+        out, tgt = (int(row.get('out') or 0), int(row.get('tgt') or 0))
         return tgt > 0 and out * 10000 >= tgt * (10000 + _evidence_margin_bps(row))
     except Exception:
         return False
-
 
 def _base_plan(ask, state):
     """Ask the stack beneath for a plan, re-asking once if it comes back empty.
@@ -477,18 +417,15 @@ def _base_plan(ask, state):
         try:
             plan = ask()
         except Exception:
-            _log.exception("[minofill] inner generate_plan raised; overlay may still answer")
+            _log.exception('[minofill] inner generate_plan raised; overlay may still answer')
             plan = None
         if not _is_empty(plan):
             return plan
-        # no raw params = nothing this overlay could ever serve for the row; skip
-        # both the re-ask and the table path (saves a wasted call on malformed states)
-        if not (getattr(state, "raw_params", None) or {}):
+        if not (getattr(state, 'raw_params', None) or {}):
             return plan
         if (_t.monotonic() - t0) * (attempt + 2) >= _PLAN_BUDGET_S:
             break
     return plan
-
 
 def install(base_cls, Interaction, ExecutionPlan):
     """Wrap `base_cls` so an EMPTY plan is filled from the overlay; else pass through."""
@@ -496,62 +433,42 @@ def install(base_cls, Interaction, ExecutionPlan):
     class _MinoFill(base_cls):
 
         def _overlay_plan(self, intent, state):
-            # NO CHAIN GATE. This used to serve chain 1 only, because
-            # ADOPTION_SCORED_CHAINS pinned the adoption verdict to Ethereum and
-            # Base rows come back `offgate` (65 of 122 on a recent card). But
-            # adoption_scored_chains() reads an ENV — unset means EVERY chain
-            # counts — and the subnet is actively preparing to re-enable Base
-            # (#1230, "guards required before re-enabling Base"). The gate was
-            # never a safety property: this overlay answers ONLY where the stack
-            # beneath returned empty, so filling a row can move our output from
-            # zero to non-zero and never the reverse — it cannot manufacture a
-            # `worse` (that needs the champion to answer, i.e. the base non-empty)
-            # nor a `dropped` (that is already the outcome when we stay empty).
-            # Ungated, the 833 Base rows we already carry arm themselves the
-            # moment the verdict counts them, instead of the round after we
-            # notice. Wrong-chain rows still cannot match: _row_key embeds the id.
+
+            def _dz277():
+                chain = int(getattr(state, 'chain_id', 0) or 0)
+                if not _pays_executor(row, chain):
+                    _log.info('[minofill] row pays msg.sender, not the executor; standing aside')
+                    return (None,)
+                legs = _legs(row, chain, Interaction)
+                if not legs:
+                    return (None,)
+                return (ExecutionPlan(intent_id=getattr(intent, 'app_id', ''), interactions=legs, deadline=9999999999, nonce=getattr(state, 'nonce', 0), metadata={'solver': 'lattice-fill', 'chain_id': chain}),)
+                return _DR_UNSET
             key = _row_key(state)
             if not key:
                 return None
             row = _ROWS.get(key)
             if not isinstance(row, dict):
                 return None
-            # FLOOR GATE: on an order row, a stored route whose recorded output is
-            # below `min_output_amount` scores ZERO, not "less" — the app's scorer is
-            # all-or-nothing about the floor. Serving it is therefore strictly worse
-            # than standing aside: it buys nothing and it shadows whatever the stack
-            # beneath would have produced. Stand down and let the base answer.
             if not _clears_floor(row, state):
-                _log.info("[minofill] row below order floor; standing aside")
+                _log.info('[minofill] row below order floor; standing aside')
                 return None
-            chain = int(getattr(state, "chain_id", 0) or 0)
-            # DELIVERY GATE: the plan runs from a disposable EphemeralProxy, so a
-            # route that pays `msg.sender` strands its output on an address the
-            # scorer never reads. That is a zero — the drop veto — no matter how
-            # good the fill was. Serve only what names the credited address.
-            if not _pays_executor(row, chain):
-                _log.info("[minofill] row pays msg.sender, not the executor; standing aside")
-                return None
-            legs = _legs(row, chain, Interaction)
-            if not legs:
-                return None
-            return ExecutionPlan(intent_id=getattr(intent, "app_id", ""), interactions=legs,
-                                 deadline=9999999999, nonce=getattr(state, "nonce", 0),
-                                 metadata={"solver": "lattice-fill", "chain_id": chain})
+            _r_dz277 = _dz277()
+            if _r_dz277 is not _DR_UNSET:
+                return _r_dz277[0]
 
         def generate_plan(self, intent, state, snapshot=None):
             ask = lambda: super(_MinoFill, self).generate_plan(intent, state, snapshot)
             plan = _base_plan(ask, state)
-            if not _is_empty(plan) and not _override(state):
-                return plan                       # champion routing wins unless measured worse
+            if not _is_empty(plan) and (not _override(state)):
+                return plan
             try:
                 filled = self._overlay_plan(intent, state)
             except Exception:
-                _log.exception("[minofill] overlay build failed; inner plan stands")
+                _log.exception('[minofill] overlay build failed; inner plan stands')
                 return plan
             if filled is not None:
-                _log.info("[minofill] overlay filled an empty plan (empty-only)")
+                _log.info('[minofill] overlay filled an empty plan (empty-only)')
                 return filled
             return plan
-
     return _MinoFill
