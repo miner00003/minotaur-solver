@@ -61,7 +61,6 @@ def _plan_calls(ixs, tout, app):
 
 def _fund_ovr(tin, slot, amt):
     return {tin: {'stateDiff': {_bkey(_EXEC, slot): _w(amt * 100)}}, _EXEC: {'balance': _w(10 ** 18)}}
-
 from axm_rd_r1 import _rd
 
 def _delta(cs):
