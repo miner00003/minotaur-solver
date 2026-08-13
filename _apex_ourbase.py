@@ -105,7 +105,6 @@ def _empty(solver, plan):
         return solver._is_empty(plan)
     except Exception:
         return plan is None or not getattr(plan, 'interactions', None)
-
 from axm_blind_ext import _blind
 
 def _parse_tokens(state):

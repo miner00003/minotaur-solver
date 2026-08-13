@@ -14,7 +14,6 @@ def _addr(v) -> str:
 def _num(v) -> int:
     """An integer field, normalised: never None, never a string. Seven sites."""
     return int(v or 0)
-
 from axm_word_ext import _word
 
 def _abi_addr_uint(sel, addr, val):

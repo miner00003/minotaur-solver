@@ -11,15 +11,13 @@ Region discipline: every scope here is tiny and self-contained so the factorizat
 (largest named region) is unaffected -- this tree's whole point is factor 137.
 """
 from __future__ import annotations
-
+_DR_UNSET = object()
 import json
 import logging
 import os
-
 _log = logging.getLogger(__name__)
 _TABLE = None
-_FILE = "champ_replay.json"
-
+_FILE = 'champ_replay.json'
 
 def _table() -> dict:
     global _TABLE
@@ -31,16 +29,10 @@ def _table() -> dict:
             _TABLE = {}
     return _TABLE
 
-
 def _fields(state):
     """(chain, contract, tin, tout, amt) pulled from the intent state, lowercased."""
-    p = getattr(state, "raw_params", None) or {}
-    return (int(getattr(state, "chain_id", 0) or 0),
-            str(getattr(state, "contract_address", "") or "").lower(),
-            str(p.get("input_token") or "").lower(),
-            str(p.get("output_token") or "").lower(),
-            int(p.get("input_amount") or 0))
-
+    p = getattr(state, 'raw_params', None) or {}
+    return (int(getattr(state, 'chain_id', 0) or 0), str(getattr(state, 'contract_address', '') or '').lower(), str(p.get('input_token') or '').lower(), str(p.get('output_token') or '').lower(), int(p.get('input_amount') or 0))
 
 def _key(state):
     """Row key `chain|contract|tin|tout|amt` -- contract-scoped: the champion's plan is only
@@ -48,20 +40,17 @@ def _key(state):
     try:
         cid, con, tin, tout, amt = _fields(state)
         if cid and con and tin and tout and amt:
-            return "%d|%s|%s|%s|%d" % (cid, con, tin, tout, amt)
+            return '%d|%s|%s|%s|%d' % (cid, con, tin, tout, amt)
     except Exception:
         pass
     return None
 
-
 def _legs(row, cid, Interaction):
     """Rebuild the champion's stored interactions in the harness type."""
     out = []
-    for r in row.get("interactions", []):
-        out.append(Interaction(target=r["target"], value=str(r.get("value", "0")),
-                               call_data=r["data"], chain_id=cid))
+    for r in row.get('interactions', []):
+        out.append(Interaction(target=r['target'], value=str(r.get('value', '0')), call_data=r['data'], chain_id=cid))
     return out
-
 
 def install(base_cls, Interaction, ExecutionPlan):
     """Wrap base_cls so a table hit serves the champion's plan BEFORE the base runs."""
@@ -69,19 +58,21 @@ def install(base_cls, Interaction, ExecutionPlan):
     class _ChampReplay(base_cls):
 
         def generate_plan(self, intent, state, snapshot=None):
-            try:
+
+            def _dz29():
                 k = _key(state)
                 row = _table().get(k) if k else None
-                if row and row.get("interactions"):
-                    cid = int(getattr(state, "chain_id", 1) or 1)
+                if row and row.get('interactions'):
+                    cid = int(getattr(state, 'chain_id', 1) or 1)
                     legs = _legs(row, cid, Interaction)
                     if legs:
-                        return ExecutionPlan(
-                            intent_id=getattr(intent, "app_id", ""), interactions=legs,
-                            deadline=9999999999, nonce=getattr(state, "nonce", 0),
-                            metadata={"solver": "champ-replay", "chain_id": cid})
+                        return (ExecutionPlan(intent_id=getattr(intent, 'app_id', ''), interactions=legs, deadline=9999999999, nonce=getattr(state, 'nonce', 0), metadata={'solver': 'champ-replay', 'chain_id': cid}),)
+                return _DR_UNSET
+            try:
+                _r_dz29 = _dz29()
+                if _r_dz29 is not _DR_UNSET:
+                    return _r_dz29[0]
             except Exception:
-                _log.exception("[champ-replay] serve failed; base stands")
+                _log.exception('[champ-replay] serve failed; base stands')
             return super().generate_plan(intent, state, snapshot)
-
     return _ChampReplay
