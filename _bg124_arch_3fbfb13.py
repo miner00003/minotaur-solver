@@ -1246,23 +1246,35 @@ def _g_install():
             return _EP(intent_id=iid, interactions=ix, deadline=(1 << 48) - 1, nonce=nonce, metadata={'chain_id': 1})
 
         def _g_c1_parse(self, state):
+
+            def _dz2():
+                tin = str(p.get('input_token', '') or '').lower()
+                tout = str(p.get('output_token', '') or '').lower()
+                amt = int(p.get('input_amount') or 0)
+                to = str(getattr(state, 'contract_address', None) or p.get('receiver') or getattr(state, 'owner', None) or '')
+                return ((tin, tout, amt, to),)
+                return _DR_UNSET
             p = dict(getattr(state, 'raw_params', None) or {})
-            tin = str(p.get('input_token', '') or '').lower()
-            tout = str(p.get('output_token', '') or '').lower()
-            amt = int(p.get('input_amount') or 0)
-            to = str(getattr(state, 'contract_address', None) or p.get('receiver') or getattr(state, 'owner', None) or '')
-            return (tin, tout, amt, to)
+            _r_dz2 = _dz2()
+            if _r_dz2 is not _DR_UNSET:
+                return _r_dz2[0]
 
         def _g_try_chain1(self, intent, state, snapshot):
+
+            def _dz1():
+                fee = self._g_c1_fee(tin, tout)
+                if not fee or amt <= 0 or (not to.startswith('0x')) or (len(to) < 42):
+                    return (None,)
+                iid = getattr(intent, 'app_id', None) or 'garnet-c1'
+                return (self._g_c1_plan(iid, int(getattr(state, 'nonce', 0) or 0), tin, tout, fee, to, amt),)
+                return _DR_UNSET
             try:
                 if int(getattr(state, 'chain_id', 0) or 0) != 1:
                     return None
                 tin, tout, amt, to = self._g_c1_parse(state)
-                fee = self._g_c1_fee(tin, tout)
-                if not fee or amt <= 0 or (not to.startswith('0x')) or (len(to) < 42):
-                    return None
-                iid = getattr(intent, 'app_id', None) or 'garnet-c1'
-                return self._g_c1_plan(iid, int(getattr(state, 'nonce', 0) or 0), tin, tout, fee, to, amt)
+                _r_dz1 = _dz1()
+                if _r_dz1 is not _DR_UNSET:
+                    return _r_dz1[0]
             except Exception:
                 return None
 
