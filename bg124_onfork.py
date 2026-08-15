@@ -39,6 +39,7 @@ def _fgm_99129():
     name the block leaves unbound stays unbound instead of being returned.
     """
     global _best, _candidates, _corroborated, _curve_cands, _curve_census, _curve_pools, _curve_row, _deep_cands, _mids, _num, _quote_all, _v2_cands, _v3_cands, _valid, _via, _w3, _w3_fallback
+
     def _w3(solver, chain_id):
         """Reuse the WRAPPED CHAMPION'S own fork-RPC handle — the one that works in
     the benchmark sandbox (`solver.rpc_urls` does NOT exist there; using it
@@ -201,8 +202,6 @@ def _fgm_99129():
 
     def _valid(tin, tout, amt, min_out, chain):
         return amt > 0 and min_out >= 0 and tin.startswith('0x') and tout.startswith('0x') and (str(chain) in A.T.get('quoter', {}))
-
-
 _fgm_99129()
 
 def _parse(state):
