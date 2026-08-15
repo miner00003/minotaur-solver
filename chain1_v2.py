@@ -1,6 +1,5 @@
 from chain1_c import _V2_PAIRS, _MAX_QUOTES
 from chain1_lib import _candidates, _qroute
-
 from axm_vres_ext import _v2_reserves
 
 def _v2_quote(w3, pair, amt, in_is_t0, block):
@@ -24,7 +23,6 @@ def _v2_swap_cd(in_is_t0, out, rcpt):
     from eth_utils import keccak as _keccak, to_checksum_address as _ck
     a0, a1 = (0, int(out)) if in_is_t0 else (int(out), 0)
     return '0x' + (_keccak(text='swap(uint256,uint256,address,bytes)')[:4] + _enc(['uint256', 'uint256', 'address', 'bytes'], [a0, a1, _ck(rcpt), b''])).hex()
-
 from axm_xfer_ext import _v2_xfer_cd
 
 def _v2_build(pair, in_is_t0, tin, amt, out, rcpt, chain_id):
