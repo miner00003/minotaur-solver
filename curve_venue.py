@@ -39,7 +39,6 @@ def _call(w3, to, data):
         return bytes(w3.eth.call({'to': _C(to), 'data': '0x' + data.hex()}))
     except Exception:
         return None
-
 from axm_caddr_ext import _addr
 
 def _find_pool(w3, reg, a, b, k):
