@@ -1,8 +1,7 @@
 _DR_UNSET = object()
 from chain1_lib import _qroute, _build, _params, _champ_route
 from chain1_v2 import _v2_build, _sweep, _v2_best
-from bg124_kira_ext import _beats_champ  # relocated leaf; see that module
-
+from bg124_kira_ext import _beats_champ
 
 def _meets_min_out(q, mo):
     """Whether quote `q` clears the order's declared minimum output.
