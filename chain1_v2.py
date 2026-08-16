@@ -23,9 +23,7 @@ def _v2_lookup(tin, tout):
         return None
     pair, t0 = ent
     return (pair, tin == t0)
-
 from lat_swapcd_ext import _v2_swap_cd
-
 from lat_xfercd_ext import _v2_xfer_cd
 
 def _v2_build(pair, in_is_t0, tin, amt, out, rcpt, chain_id):
