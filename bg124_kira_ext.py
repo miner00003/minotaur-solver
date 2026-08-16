@@ -8,7 +8,6 @@ cannot change resolution of any name it uses.
 """
 from chain1_lib import _qroute, _champ_route
 
-
 def _beats_champ(w3, tin, tout, amt, block, q_mine, route):
     croute = _champ_route(tin, tout)
     if route == croute:
