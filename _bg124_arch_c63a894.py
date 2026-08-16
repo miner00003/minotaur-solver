@@ -484,6 +484,7 @@ class _ApexBrand_payload_cover_k(SOLVER_CLASS):
         except Exception:
             pass
         return m
+
 def _fgm_21170():
     """Lifted from this module's top-level AST region to lower it.
 
@@ -608,5 +609,4 @@ def _fgm_21170():
             import logging as _pblog
             _pblog.getLogger(__name__).exception('[pacing-bridge] load failed; refusing at gate')
     _build_pacing_bridge()
-
 _fgm_21170()
